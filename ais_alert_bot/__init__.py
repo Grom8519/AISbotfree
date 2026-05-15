@@ -1,0 +1,1 @@
+"""AIS Telegram alert bot."""
