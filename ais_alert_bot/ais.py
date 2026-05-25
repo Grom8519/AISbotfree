@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass
 import json
+import ssl
 from typing import Any, Protocol
 
 import httpx
@@ -176,6 +177,7 @@ class AISStreamProvider:
             raise AISProviderError("AISSTREAM_API_KEY is not configured")
         self.api_key = api_key
         self.wait_seconds = wait_seconds
+        self.ssl_context = ssl._create_unverified_context()
 
     async def latest_position_by_mmsi(self, mmsi: str) -> VesselPosition:
         subscribe_message = {
@@ -184,7 +186,7 @@ class AISStreamProvider:
             "FiltersShipMMSI": [mmsi],
             "FilterMessageTypes": self.position_message_types,
         }
-        async with websockets.connect(self.stream_url) as websocket:
+        async with websockets.connect(self.stream_url, ssl=self.ssl_context) as websocket:
             await websocket.send(json.dumps(subscribe_message))
             return await asyncio.wait_for(self._read_position(websocket, query=mmsi), timeout=self.wait_seconds)
 
@@ -201,7 +203,7 @@ class AISStreamProvider:
             "BoundingBoxes": [[[-90, -180], [90, 180]]],
             "FilterMessageTypes": ["ShipStaticData"],
         }
-        async with websockets.connect(self.stream_url) as websocket:
+        async with websockets.connect(self.stream_url, ssl=self.ssl_context) as websocket:
             await websocket.send(json.dumps(subscribe_message))
             return await asyncio.wait_for(self._read_static_mmsi(websocket, imo), timeout=self.wait_seconds)
 

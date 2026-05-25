@@ -12,6 +12,8 @@ Telegram bot that watches AIS vessel positions and sends an alert when a vessel 
 - Store watches in SQLite.
 - Periodic polling with per-watch intervals.
 - One alert per approach, then tracking stops automatically.
+- ETA-based alerting: if speed is available, the bot also predicts radius entry with `time = distance / speed`.
+- In the last 2 nautical miles before the radius, the bot checks more often and warns about major speed/course changes.
 
 ## Telegram Commands
 
@@ -48,6 +50,8 @@ Current bot menu:
 
 `/remove` removes an active watch by MMSI or IMO. `/reset` cancels all active watches after a 3-digit confirmation code. `/empty_list` deletes inactive watch records after a 5-digit confirmation code.
 
+During tracking, the bot alerts when either GPS data shows the vessel inside the radius or the calculated ETA reaches the radius first. If speed is zero or unavailable, ETA cannot be calculated and the bot continues GPS tracking. Major movement changes are reported during the last 2 nautical miles before the radius: speed changes over 40%, or course changes over 30 degrees.
+
 ## Setup
 
 1. Create a bot with BotFather and copy the Telegram token.
@@ -75,11 +79,16 @@ Set `AIS_PROVIDER` in `.env`.
 
 ```env
 AIS_PROVIDER=aisstream
+INITIAL_LOOKUP_SECONDS=20
+STALE_POSITION_MINUTES=60
+STALE_REFRESH_INTERVAL_MINUTES=30
 AISSTREAM_API_KEY=your_free_key
 AISSTREAM_WAIT_SECONDS=90
 ```
 
 AISStream streams global AIS data over WebSocket and supports MMSI filters. IMO support is best-effort: the bot first waits for `ShipStaticData` with the requested IMO to discover MMSI, then tracks that MMSI. For reliable free tracking, use MMSI whenever possible.
+
+`INITIAL_LOOKUP_SECONDS` limits how long the bot waits for live AIS/GPS data during the first MMSI/IMO request. If no live data arrives in that time, the number is still accepted and tracking continues in the background. `STALE_POSITION_MINUTES` controls when the bot treats a received AIS/GPS position as old. If the latest update is older than this value, the bot warns the user first, then shows the vessel name, MMSI, course, speed, and last update time before continuing to ask for the radius. While updates remain old, `STALE_REFRESH_INTERVAL_MINUTES` controls how often the bot rechecks for fresh AIS/GPS data. Once a fresh timestamp arrives, the bot returns to the normal watch interval and recalculates ETA from the new speed/course/distance.
 
 ### MarineTraffic
 
